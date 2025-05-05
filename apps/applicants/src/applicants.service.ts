@@ -1,42 +1,47 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateApplicantInput } from './dto/create-applicant.input';
 import { UpdateApplicantInput } from './dto/update-applicant.input';
+import { Applicant } from './entities/applicant.entity';
 
 @Injectable()
 export class ApplicantsService {
-  private readonly applicants;
+  constructor(
+    @InjectRepository(Applicant)
+    private readonly applicantRepository: Repository<Applicant>,
+  ) {}
 
-  constructor() {
-    this.applicants = [];
+  async create(createApplicantInput: CreateApplicantInput): Promise<Applicant> {
+    const applicant = this.applicantRepository.create({
+      ...createApplicantInput,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    return this.applicantRepository.save(applicant);
   }
 
-  create(createApplicantInput: CreateApplicantInput) {
-    this.applicants.push(createApplicantInput);
-    return createApplicantInput;
+  async findAll(): Promise<Applicant[]> {
+    return this.applicantRepository.find();
   }
 
-  findAll() {
-    return this.applicants;
+  async findOne(id: string): Promise<Applicant> {
+    return this.applicantRepository.findOneBy({ id });
   }
 
-  findOne(id: string) {
-    return this.applicants.find((applicant) => applicant.id === id);
+  async update(
+    id: string,
+    updateApplicantInput: UpdateApplicantInput,
+  ): Promise<Applicant> {
+    await this.applicantRepository.update(id, {
+      ...updateApplicantInput,
+      updatedAt: new Date(),
+    });
+    return this.findOne(id);
   }
 
-  update(id: string, updateApplicantInput: UpdateApplicantInput) {
-    const applicant = this.applicants.find((applicant) => applicant.id === id);
-    if (applicant) {
-      Object.assign(applicant, updateApplicantInput);
-      return applicant;
-    }
-    return null;
-  }
-
-  remove(id: string) {
-    const index = this.applicants.findIndex((applicant) => applicant.id === id);
-    if (index >= 0) {
-      this.applicants.splice(index, 1);
-    }
+  async remove(id: string): Promise<boolean> {
+    const result = await this.applicantRepository.delete(id);
+    return result.affected > 0;
   }
 }

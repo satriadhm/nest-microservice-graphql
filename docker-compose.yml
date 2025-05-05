@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_MULTIPLE_DATABASES: gateway_db,applicants_db,parsers_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+    ports:
+      - "5432:5432"
+    networks:
+      - nestjs-network
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - nestjs-network
+    volumes:
+      - redis-data:/data
+
+  gateway:
+    build:
+      context: .
+      dockerfile: ./apps/gateway/Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+      - applicants
+      - parsers
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_DATABASE=gateway_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - APPLICANTS_SERVICE_URL=http://applicants:3001/graphql
+      - PARSERS_SERVICE_URL=http://parsers:3002/graphql
+    networks:
+      - nestjs-network
+    volumes:
+      - ./apps/gateway:/usr/src/app/apps/gateway
+      - node_modules:/usr/src/app/node_modules
+
+  applicants:
+    build:
+      context: .
+      dockerfile: ./apps/applicants/Dockerfile
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_DATABASE=applicants_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=3001
+    networks:
+      - nestjs-network
+    volumes:
+      - ./apps/applicants:/usr/src/app/apps/applicants
+      - node_modules:/usr/src/app/node_modules
+
+  parsers:
+    build:
+      context: .
+      dockerfile: ./apps/parsers/Dockerfile
+    ports:
+      - "3002:3002"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_DATABASE=parsers_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=3002
+      - EMAIL_USER=your-email@gmail.com
+      - EMAIL_PASS=your-email-password
+    networks:
+      - nestjs-network
+    volumes:
+      - ./apps/parsers:/usr/src/app/apps/parsers
+      - ./uploads:/usr/src/app/uploads
+      - node_modules:/usr/src/app/node_modules
+
+networks:
+  nestjs-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  node_modules:
+  uploads:

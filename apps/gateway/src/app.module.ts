@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { GraphQLModule } from '@nestjs/graphql';
@@ -7,23 +8,34 @@ import { IntrospectAndCompose } from '@apollo/gateway';
 
 @Module({
   imports: [
-    GraphQLModule.forRoot<ApolloGatewayDriverConfig>({
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    GraphQLModule.forRootAsync<ApolloGatewayDriverConfig>({
       driver: ApolloGatewayDriver,
-      server: {},
-      gateway: {
-        supergraphSdl: new IntrospectAndCompose({
-          subgraphs: [
-            {
-              name: 'applicants',
-              url: 'http://localhost:3001/graphql',
-            },
-            {
-              name: 'parsers',
-              url: 'http://localhost:3002/graphql',
-            },
-          ],
-        }),
+      useFactory: (configService: ConfigService) => {
+        const applicantsUrl = configService.get('APPLICANTS_SERVICE_URL') || 'http://localhost:3001/graphql';
+        const parsersUrl = configService.get('PARSERS_SERVICE_URL') || 'http://localhost:3002/graphql';
+        
+        return {
+          server: {},
+          gateway: {
+            supergraphSdl: new IntrospectAndCompose({
+              subgraphs: [
+                {
+                  name: 'applicants',
+                  url: applicantsUrl,
+                },
+                {
+                  name: 'parsers',
+                  url: parsersUrl,
+                },
+              ],
+            }),
+          },
+        };
       },
+      inject: [ConfigService],
     }),
   ],
   controllers: [AppController],
